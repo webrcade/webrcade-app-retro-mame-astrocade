@@ -1,22 +1,10 @@
-# webЯcade Application: Super Nintendo (SNES) Emulator
+# webЯcade Application: Bally Astrocade Emulator
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-The  Super Nintendo Entertainment System (SNES) application for [webЯcade](https://www.webrcade.com) is an emulator for the [Super Nintendo Entertainment System game console](https://en.wikipedia.org/wiki/Super_Nintendo_Entertainment_System).
+The Bally Astrocade application for [webЯcade](https://www.webrcade.com) is an emulator for the [Bally Astrocade game console](https://en.wikipedia.org/wiki/Bally_Astrocade).
 
-The underlying emulator is a modified version of the Libretro fork of [Snes9x](https://github.com/libretro/snes9x).
-
-<p align="center">
- <a href="https://play.webrcade.com">
-  <img src="https://docs.webrcade.com/assets/images/apps/snes.png" width="90%">
- </a>
- <br>
- <i>Super Boss Gaiden by Dieter von Laser</i>
-</p>
-
-## Documentation
-
-The [Super Nintendo Application Documentation](https://docs.webrcade.com/apps/emulators/snes/) includes [keyboard](https://docs.webrcade.com/apps/emulators/snes/#keyboard) and [gamepad](https://docs.webrcade.com/apps/emulators/snes/#gamepad) control mappings, information related to [battery-backed SRAM](https://docs.webrcade.com/apps/emulators/snes/#battery-backed-sram) support, and details regarding the use of the emulator within a [webЯcade feed](https://docs.webrcade.com/apps/emulators/snes/#feed). 
+The underlying emulator is a MAME-based core.
 
 ## LICENSE
 
@@ -28,4 +16,4 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 ---
 
-The license presented above is limited to the Super Nintendo application for [webЯcade](https://www.webrcade.com). The underlying Libretro Snes9x project retains its own specific licensing.
+The license presented above is limited to the Bally Astrocade application for [webЯcade](https://www.webrcade.com). The underlying MAME project retains its own specific licensing.
