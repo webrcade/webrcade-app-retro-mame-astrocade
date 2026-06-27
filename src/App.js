@@ -17,6 +17,20 @@ class App extends WebrcadeRetroApp {
   lastKeyCol = 2;
 
   createEmulator(app, isDebug) {
+    const { appProps } = this;
+
+    let mappings = appProps.mappings;
+    if (!mappings || Object.keys(mappings).length === 0) {
+      mappings = { "a": "fire", "b": "fire", "lb": "fire", "rb": "fire" };
+    }
+    this.mappings = mappings;
+    this.descriptions = appProps.descriptions || {};
+    this.analogDirection = appProps.analogDirection ?? 0;
+    this.analogInvert = appProps.analogInvert ?? false;
+    const controlMode = parseInt(appProps.controlMode ?? 0, 10);
+    this.dualController = controlMode === 1;
+    this.icbm = controlMode === 2;
+
     return new Emulator(app, isDebug);
   }
 

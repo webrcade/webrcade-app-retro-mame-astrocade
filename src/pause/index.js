@@ -178,12 +178,12 @@ export class EmulatorPauseScreen extends Component {
               {
                 image: GamepadWhiteImage,
                 label: Resources.getText(TEXT_IDS.GAMEPAD_CONTROLS),
-                content: <GamepadControlsTab />,
+                content: <GamepadControlsTab emulator={emulator} />,
               },
               {
                 image: KeyboardWhiteImage,
                 label: Resources.getText(TEXT_IDS.KEYBOARD_CONTROLS),
-                content: <KeyboardControlsTab />,
+                content: <KeyboardControlsTab emulator={emulator} />,
               },
             ]}
           />
