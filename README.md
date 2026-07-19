@@ -2,9 +2,21 @@
 
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
-The Bally Astrocade application for [webЯcade](https://www.webrcade.com) is an emulator for the [Bally Astrocade game console](https://en.wikipedia.org/wiki/Bally_Astrocade).
+The Bally Astrocade application for [webЯcade](https://www.webrcade.com) is an emulator for the [Bally Astrocade](https://en.wikipedia.org/wiki/Bally_Astrocade) home video game console.
 
-The underlying emulator is a MAME-based core.
+The underlying emulator is the Libretro port of [MAME](https://github.com/libretro/mame).
+
+<p align="center">
+ <a href="https://play.webrcade.com">
+  <img src="https://docs.webrcade.com/assets/images/apps/astrocade.png" width="90%">
+ </a>
+ <br>
+ <i>Bally Astrocade</i>
+</p>
+
+## Documentation
+
+The [Bally Astrocade Application Documentation](https://docs.webrcade.com/apps/emulators/astrocade/) includes [keyboard](https://docs.webrcade.com/apps/emulators/astrocade/#keyboard) and [gamepad](https://docs.webrcade.com/apps/emulators/astrocade/#gamepad) control mappings, information related to the [keypad](https://docs.webrcade.com/apps/emulators/astrocade/#keypad) and [BIOS file](https://docs.webrcade.com/apps/emulators/astrocade/#bios-file), and details regarding the use of the emulator within a [webЯcade feed](https://docs.webrcade.com/apps/emulators/astrocade/#feed).
 
 ## LICENSE
 
@@ -16,4 +28,4 @@ Unless required by applicable law or agreed to in writing, software distributed 
 
 ---
 
-The license presented above is limited to the Bally Astrocade application for [webЯcade](https://www.webrcade.com). The underlying MAME project retains its own specific licensing.
+The license presented above is limited to the Bally Astrocade application for [webЯcade](https://www.webrcade.com). The underlying [Libretro MAME](https://github.com/libretro/mame) project retains its own specific licensing.
