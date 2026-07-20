@@ -189,6 +189,14 @@ export class Emulator extends RetroAppWrapper {
         const isDown = (input & button.inp) !== 0;
         if (isDown) outInput &= ~button.inp;
 
+        // In dual controller mode, "b"/"rb" are the second virtual player's
+        // fire button (see the dualController branch below). Skip them here
+        // so the primary player doesn't also fire on the same press.
+        if (this.dualController && (controller === 0 || controller === 2) &&
+            (button.button === 'b' || button.button === 'rb')) {
+          continue;
+        }
+
         const mapping = mappings[button.button];
         if (!mapping) continue;
 
