@@ -62,7 +62,7 @@ class App extends WebrcadeRetroApp {
         controllerIndex={controllerIndex}
         initialRow={this.lastKeyRow}
         initialCol={this.lastKeyCol}
-        onSelect={(scancode, r, c) => { this.lastKeyRow = r; this.lastKeyCol = c; emulator.sendKeyDown(scancode); }}
+        onSelect={(scancode, r, c, keyCode) => { this.lastKeyRow = r; this.lastKeyCol = c; emulator.sendKeyDown(scancode, keyCode); }}
         closeCallback={() => { this.resume(CONTROLLERS_MODE); }}
         descriptions={descriptions}
         emulator={emulator}

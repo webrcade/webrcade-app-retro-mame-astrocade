@@ -26,6 +26,18 @@ export class Emulator extends RetroAppWrapper {
 
     window.emulator = this;
 
+    // a5200's own keypad/keypadDown/keypadCount triplet, same shape and
+    // same purpose: pollControls() gates its CIDS.START ("show keypad
+    // screen") check behind `if (!keypadInput)` so the same Enter press
+    // that just selected a key can't also be read as a fresh Start press
+    // reopening the screen. sendKeyDown()'s own key simulation doesn't
+    // need this (it self-manages via setTimeout), but the gate does --
+    // unlike a5200/jaguar, astrocade has no natural persistent "current
+    // keypad value" to reuse, so this exists purely to drive the gate.
+    this.keypad = [0, 0];
+    this.keypadDown = [false, false];
+    this.keypadCount = [0, 0];
+
     this.frequency = 60;
     this.audioStarted = 0;
     this.firstFrame = true;
@@ -154,7 +166,30 @@ export class Emulator extends RetroAppWrapper {
     return map[code] || 0;
   }
 
-  sendKeyDown(code) {
+  // keyPressed (a5200's own onKeypad naming/pattern): the browser key
+  // code that triggered this selection, if it came from a real keyboard
+  // press (e.g. "Enter"). showControllers() disables the main keyboard
+  // listener for the life of the on-screen keypad screen, so it never
+  // observes the keydown that made this selection -- without this
+  // synthetic "down" event, isControlDown(CIDS.START) would read
+  // stale/false even while Enter is still physically held, breaking the
+  // showControllers() release-wait that guards against the screen
+  // immediately reopening.
+  sendKeyDown(code, keyPressed = null) {
+    const { controllers } = this;
+
+    if (keyPressed && controllers) {
+      controllers.addFakeKeyEvent(keyPressed, true);
+    }
+
+    // Same keypad/keypadDown/keypadCount update a5200's onKeypad() does,
+    // unconditionally (not just for keyboard-driven selections) -- also
+    // covers a gamepad A-button selection staying "held" via
+    // isControlDown(CIDS.A) in pollControls(), same as a5200.
+    this.keypad[0] = code;
+    this.keypadDown[0] = true;
+    this.keypadCount[0] = 10;
+
     const retrok = typeof code === 'number' ? code : this._browserCodeToRetrok(code);
     const { Module } = window;
     if (retrok && Module && Module._wrc_on_key) {
@@ -307,7 +342,30 @@ export class Emulator extends RetroAppWrapper {
     if (controllers) {
       controllers.poll();
 
-      if (controllers.isControlDown(0, CIDS.START)) {
+      // Same keypadInput derivation as a5200's pollControls(): stays
+      // truthy for as long as the physical select input (gamepad A, or
+      // Enter for keyboard) stays held after a keypad selection, via
+      // keypadDown/keypadCount (set in sendKeyDown()).
+      let keypadInput = false;
+      if (this.keypad[0]) {
+        this.keypadCount[0]--;
+
+        if (this.keypadDown[0]) {
+          this.keypadDown[0] = (controllers.isControlDown(0, CIDS.A) || controllers.isControlDown(0, CIDS.START));
+        }
+
+        if (this.keypadCount[0] <= 0 && !this.keypadDown[0]) {
+          this.keypad[0] = 0;
+          this.keypadCount[0] = 0;
+          this.keypadDown[0] = false;
+        }
+
+        if (this.keypad[0]) {
+          keypadInput = true;
+        }
+      }
+
+      if (!keypadInput && controllers.isControlDown(0, CIDS.START)) {
         if (this.pause(true)) {
           controllers
             .waitUntilControlReleased(0, CIDS.START)

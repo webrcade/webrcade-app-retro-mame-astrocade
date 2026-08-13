@@ -97,7 +97,7 @@ export class Controller extends Component {
         if (e.index !== controllerIndex) return;
       }
       if (e.clientX !== undefined && e.clientX === 0) return;
-      onSelect(scancode, r, c);
+      onSelect(scancode, r, c, e && e.code);
     };
 
     const rows = SCANCODES.map((rowCodes, r) => (
@@ -201,7 +201,7 @@ export class ControllersScreen extends Screen {
       if (controllerIndex === 0) {
         if (row >= 0 && col >= 0) {
           this.close();
-          onSelect(SCANCODES[row][col], row, col);
+          onSelect(SCANCODES[row][col], row, col, e.code);
         } else if (e.code === KCODES.ENTER) {
           this.close();
         }
@@ -245,9 +245,9 @@ export class ControllersScreen extends Screen {
     }
   }
 
-  onSelectFunc(scancode, r, c) {
+  onSelectFunc(scancode, r, c, keyCode) {
     const { onSelect } = this.props;
-    onSelect(scancode, r, c);
+    onSelect(scancode, r, c, keyCode);
     this.close();
   }
 
@@ -269,7 +269,7 @@ export class ControllersScreen extends Screen {
         emulator={emulator}
         descriptions={descriptions}
         controllerIndex={controllerIndex}
-        onSelect={(scancode, r, c) => this.onSelectFunc(scancode, r, c)}
+        onSelect={(scancode, r, c, keyCode) => this.onSelectFunc(scancode, r, c, keyCode)}
         col={col}
         row={row}
         onFocusChanged={onFocusChanged}
