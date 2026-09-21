@@ -1,6 +1,7 @@
 import React from "react";
 
 import {
+  TouchOverlay,
   WebrcadeRetroApp
 } from '@webrcade/app-common';
 
@@ -15,6 +16,18 @@ class App extends WebrcadeRetroApp {
   CONTROLLERS_MODE = "controllers";
   lastKeyRow = 3;
   lastKeyCol = 2;
+
+  constructor() {
+    super();
+    this.state = {
+      ...this.state,
+      showCanvas: false,
+    };
+  }
+
+  showCanvas() {
+    this.setState({ showCanvas: true });
+  }
 
   createEmulator(app, isDebug) {
     const { appProps } = this;
@@ -63,7 +76,20 @@ class App extends WebrcadeRetroApp {
         initialRow={this.lastKeyRow}
         initialCol={this.lastKeyCol}
         onSelect={(scancode, r, c, keyCode) => { this.lastKeyRow = r; this.lastKeyCol = c; emulator.sendKeyDown(scancode, keyCode); }}
-        closeCallback={() => { this.resume(CONTROLLERS_MODE); }}
+        closeCallback={(r, c) => {
+          // WRC - closing without picking a key (cancel) used to leave
+          // lastKeyRow/lastKeyCol at wherever the last actual selection
+          // was, not wherever the cursor was just navigated to -
+          // reopening the keypad would jump back to the old selection
+          // instead of where the player had last been looking.
+          // ControllersScreen's close() now always passes its current
+          // row/col here, same fix as retro-a5200/colem.
+          if (r !== undefined && c !== undefined) {
+            this.lastKeyRow = r;
+            this.lastKeyCol = c;
+          }
+          this.resume(CONTROLLERS_MODE);
+        }}
         descriptions={descriptions}
         emulator={emulator}
       />
@@ -109,13 +135,14 @@ class App extends WebrcadeRetroApp {
   }
 
   render() {
-    const { mode } = this.state;
+    const { mode, showCanvas } = this.state;
     const { CONTROLLERS_MODE } = this;
 
     return (
       <>
         {super.render()}
         {mode === CONTROLLERS_MODE ? this.renderControllersScreen() : null}
+        <TouchOverlay show={showCanvas} />
       </>
     );
   }

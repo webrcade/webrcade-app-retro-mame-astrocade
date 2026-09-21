@@ -1,5 +1,5 @@
 import {
-  RetroAppWrapper,
+  BasicRetroAppWrapper,
   CIDS,
   KCODES,
   LOG,
@@ -16,7 +16,7 @@ const LABEL_TO_RETROK = {
   "CE": 101, "0":  48,  ".":  46,  "=": 271,
 };
 
-export class Emulator extends RetroAppWrapper {
+export class Emulator extends BasicRetroAppWrapper {
 
   GAME_SRAM_NAME = 'game.srm';
   SAVE_NAME = 'sav';
@@ -27,13 +27,15 @@ export class Emulator extends RetroAppWrapper {
     window.emulator = this;
 
     // a5200's own keypad/keypadDown/keypadCount triplet, same shape and
-    // same purpose: pollControls() gates its CIDS.START ("show keypad
-    // screen") check behind `if (!keypadInput)` so the same Enter press
-    // that just selected a key can't also be read as a fresh Start press
-    // reopening the screen. sendKeyDown()'s own key simulation doesn't
-    // need this (it self-manages via setTimeout), but the gate does --
-    // unlike a5200/jaguar, astrocade has no natural persistent "current
-    // keypad value" to reuse, so this exists purely to drive the gate.
+    // same purpose: pollControls() gates its CIDS.SELECT ("show keypad
+    // screen") check behind `if (!keypadInput)` so an Enter press that
+    // just confirmed a key selection (CIDS.START, see keypadDown below -
+    // a separate keyboard-confirm concern, unrelated to what opens the
+    // screen) can't also be misread there. sendKeyDown()'s own key
+    // simulation doesn't need this (it self-manages via setTimeout), but
+    // the gate does -- unlike a5200/jaguar, astrocade has no natural
+    // persistent "current keypad value" to reuse, so this exists purely
+    // to drive the gate.
     this.keypad = [0, 0];
     this.keypadDown = [false, false];
     this.keypadCount = [0, 0];
@@ -41,6 +43,19 @@ export class Emulator extends RetroAppWrapper {
     this.frequency = 60;
     this.audioStarted = 0;
     this.firstFrame = true;
+
+    // WRC - tracks Control/Shift physical state directly, since this app
+    // has no CIDS-based keyboard mapping to hook into like a5200/colem's
+    // CONTROL_KEY pseudo-mapping does - all keyboard input here goes
+    // straight through the raw document.onkeydown/onkeyup handlers below
+    // instead. ctrlHeld/shiftHeld reflect the current physical state;
+    // controlKeyDown is the previous-frame edge-detect flag, same naming
+    // a5200 uses for its own equivalent.
+    this.ctrlHeld = false;
+    this.shiftHeld = false;
+    this.controlKeyDown = false;
+    this.controlKeyEscalated = false;
+    this.gamepadVkPending = false;
     this.mappings = app.mappings || {};
     this.descriptions = app.descriptions || {};
     this.mappingState = new Set();
@@ -120,9 +135,56 @@ export class Emulator extends RetroAppWrapper {
     if (this.firstFrame) {
       this.firstFrame = false;
 
+      this.app.showCanvas();
+
       setTimeout(() => {
+        const onTouch = () => { this.onTouchEvent() };
+        window.addEventListener("touchstart", onTouch);
+        window.addEventListener("touchend", onTouch);
+        window.addEventListener("touchcancel", onTouch);
+        window.addEventListener("touchmove", onTouch);
+
+        const onMouse = () => { this.onMouseEvent() };
+        window.addEventListener("mousedown", onMouse);
+        window.addEventListener("mouseup", onMouse);
+        window.addEventListener("mousemove", onMouse);
+
         document.onkeydown = (e) => {
+          // WRC - Control opens the grid keypad screen (see
+          // pollControls()), keyboard equivalent of the gamepad LT+RA
+          // combo - intercepted here instead of forwarded to the native
+          // core, same as a5200/colem/Jaguar repurposing Control despite
+          // it being a real key on modern keyboards (none of these
+          // systems have a Control-equivalent button, so there's no real
+          // conflict). Shift is tracked the same way for the Ctrl+Shift
+          // escalate-to-pause check, but is NOT intercepted - it still
+          // needs to reach _browserCodeToRetrok's shiftMap below for
+          // real shifted-symbol input. Both tracked BEFORE the `paused`
+          // check below: pollControls() calls pause(true) the instant
+          // Control goes down, so if this tracking lived after that
+          // check, the matching keyup (Control's release) would be
+          // silently swallowed once paused, leaving ctrlHeld stuck true
+          // forever and the release-wait loop in pollControls() spinning
+          // indefinitely - a real bug caught before shipping this.
+          if (e.code === KCODES.CONTROL_LEFT || e.code === KCODES.CONTROL_RIGHT) {
+            this.ctrlHeld = true;
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+          }
+          if (e.code === KCODES.SHIFT_LEFT || e.code === KCODES.SHIFT_RIGHT) {
+            this.shiftHeld = true;
+          }
+
           if (this.paused) return;
+          // WRC - feeds the shared on-screen-controls auto-detection
+          // (BasicRetroAppWrapper's checkOnScreenControls()) the same
+          // way every other app's onkeydown does. Added here rather
+          // than a separate handler since document.onkeydown can only
+          // ever hold one function - a second assignment would have
+          // silently replaced this raw keyboard forwarding entirely.
+          this.onKeyboardEvent(e);
+
           if (e.repeat !== undefined && e.repeat) return;
           const retrok = this._browserCodeToRetrok(e.code, e.shiftKey);
           if (retrok) {
@@ -133,7 +195,21 @@ export class Emulator extends RetroAppWrapper {
         };
 
         document.onkeyup = (e) => {
+          // WRC - see the matching comment in onkeydown above - tracked
+          // unconditionally, before the `paused` check, so release is
+          // never missed while paused.
+          if (e.code === KCODES.CONTROL_LEFT || e.code === KCODES.CONTROL_RIGHT) {
+            this.ctrlHeld = false;
+            e.stopPropagation();
+            e.preventDefault();
+            return;
+          }
+          if (e.code === KCODES.SHIFT_LEFT || e.code === KCODES.SHIFT_RIGHT) {
+            this.shiftHeld = false;
+          }
+
           if (this.paused) return;
+
           const retrok = this._browserCodeToRetrok(e.code, e.shiftKey);
           if (retrok) {
             window.Module._wrc_on_key(retrok, 0);
@@ -144,6 +220,12 @@ export class Emulator extends RetroAppWrapper {
       }, 10);
     }
   }
+
+  // Base class default pauses on any tap anywhere on screen -- redundant
+  // (and disruptive) now that there's a dedicated Pause button in the
+  // touch overlay. Same override every other TouchOverlay app uses for
+  // the same reason.
+  createTouchListener() {}
 
   _browserCodeToRetrok(code, shiftKey) {
     if (shiftKey) {
@@ -173,8 +255,7 @@ export class Emulator extends RetroAppWrapper {
   // observes the keydown that made this selection -- without this
   // synthetic "down" event, isControlDown(CIDS.START) would read
   // stale/false even while Enter is still physically held, breaking the
-  // showControllers() release-wait that guards against the screen
-  // immediately reopening.
+  // keypadDown hold-check above.
   sendKeyDown(code, keyPressed = null) {
     const { controllers } = this;
 
@@ -365,10 +446,88 @@ export class Emulator extends RetroAppWrapper {
         }
       }
 
-      if (!keypadInput && controllers.isControlDown(0, CIDS.START)) {
+      if (!keypadInput) {
+        // LT+RA opens the grid keypad screen -- same gesture Apple II/
+        // Apple IIGS/Commodore 8-bit/DOSBox Pure/a5200/colem/Jaguar use
+        // for their own on-screen keyboard/keypad, via the shared
+        // CIDS.WRC_CUSTOM synthetic control. Per
+        // docs/control-mapping-audit.md's GRP3 target row for this app -
+        // "VKeypad Gamepad: LT+RA" / "VKeypad Keyboard: CTRL" - this was
+        // never implemented at all until now.
+        if (controllers.isControlDown(0, CIDS.WRC_CUSTOM)) {
+          if (!this.gamepadVkPending) {
+            this.gamepadVkPending = true;
+            controllers
+              .waitUntilControlReleased(0, CIDS.WRC_CUSTOM)
+              .then(() => {
+                this.gamepadVkPending = false;
+                if (this.pause(true)) {
+                  this.showControllers(0);
+                }
+              });
+          }
+        } else {
+          // Control key opens the grid keypad screen -- keyboard
+          // equivalent of LT+RA above, matching a5200/colem/Jaguar's
+          // exact pattern (wait for release, escalate to the real pause
+          // menu if Shift joins mid-press - the Ctrl+Shift muscle-memory
+          // case) but reading this.ctrlHeld/shiftHeld directly (tracked
+          // in the raw onkeydown/onkeyup handlers above) instead of a
+          // CIDS keymap, since this app has no custom KeyCodeToControlMapping
+          // to hook a pseudo-control into like those apps do.
+          if (this.ctrlHeld && !this.controlKeyDown && this.pause(true)) {
+            this.controlKeyEscalated = false;
+            const CONTROL_KEY_WAIT_INTERVAL = 50;
+            const waitForControlKeyRelease = () => {
+              if (this.shiftHeld) {
+                this.controlKeyEscalated = true;
+              }
+              if (this.ctrlHeld) {
+                setTimeout(waitForControlKeyRelease, CONTROL_KEY_WAIT_INTERVAL);
+              } else if (this.controlKeyEscalated) {
+                this.showPauseMenu();
+              } else {
+                this.showControllers(0);
+              }
+            };
+            setTimeout(waitForControlKeyRelease, CONTROL_KEY_WAIT_INTERVAL);
+          }
+          this.controlKeyDown = this.ctrlHeld;
+        }
+      }
+
+      // WRC - explicit CIDS.ESCAPE check, positioned before the
+      // CIDS.SELECT check below, matching a5200/colem's exact ordering -
+      // a real bug the user caught: on a non-Xbox pad, CIDS.ESCAPE's own
+      // synthesis includes SELECT+X (see controls.js), which overlaps
+      // with literal CIDS.SELECT itself. This app has no explicit
+      // CIDS.ESCAPE handling of its own - it relies entirely on
+      // super.pollControls() below for that - so without this check,
+      // pressing X+Select got caught by the CIDS.SELECT branch below
+      // FIRST (which returns early), and super.pollControls() never got
+      // a chance to run, meaning Select+X opened the keypad instead of
+      // pausing. Checking ESCAPE first and returning here (before
+      // reaching the SELECT branch) restores the correct priority:
+      // Pause wins over the keypad whenever both combos are satisfied
+      // at once.
+      if (controllers.isControlDown(0, CIDS.ESCAPE)) {
         if (this.pause(true)) {
           controllers
-            .waitUntilControlReleased(0, CIDS.START)
+            .waitUntilControlReleased(0, CIDS.ESCAPE)
+            .then(() => this.showPauseMenu());
+          return;
+        }
+      }
+
+      // WRC - per docs/control-mapping-audit.md's GRP3 target: Select
+      // opens the keypad (Astrocade has no physical Start button either,
+      // so per the doc Start would be read but produce no defined
+      // function) - this used to be on CIDS.START instead, fixed to
+      // match the doc and retro-a5200/colem.
+      if (!keypadInput && controllers.isControlDown(0, CIDS.SELECT)) {
+        if (this.pause(true)) {
+          controllers
+            .waitUntilControlReleased(0, CIDS.SELECT)
             .then(() => this.showControllers(0));
           return;
         }

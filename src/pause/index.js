@@ -192,6 +192,7 @@ export class EmulatorPauseScreen extends Component {
           <AstrocadeSettingsEditor
             emulator={emulator}
             onClose={closeCallback}
+            showOnScreenControls={true}
           />
         ) : null}
         {mode === ModeEnum.CHEATS ? (
