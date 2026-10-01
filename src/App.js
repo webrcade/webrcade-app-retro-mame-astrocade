@@ -142,7 +142,25 @@ class App extends WebrcadeRetroApp {
       <>
         {super.render()}
         {mode === CONTROLLERS_MODE ? this.renderControllersScreen() : null}
-        <TouchOverlay show={showCanvas} />
+        <TouchOverlay
+          show={showCanvas}
+          showKeypad={true}
+          onKeypadClick={() => {
+            // WRC - must go through the emulator's showControllers()
+            // wrapper (same as the LT+RA gamepad gesture in
+            // emulator/index.js's pollControls()), not the bare App-level
+            // showControllers() directly - the wrapper is what pauses the
+            // emulator, disables real controller/keyboard input for the
+            // life of the keypad screen, and re-enables/resumes on close.
+            // Calling the App method directly skipped all of that, leaving
+            // input live while the keypad was open and never resuming on
+            // select/close.
+            const { emulator } = this;
+            if (emulator.pause(true)) {
+              emulator.showControllers(0);
+            }
+          }}
+        />
       </>
     );
   }
