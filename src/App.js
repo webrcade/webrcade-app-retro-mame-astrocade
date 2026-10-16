@@ -1,6 +1,7 @@
 import React from "react";
 
 import {
+  TouchOverlay,
   WebrcadeRetroApp
 } from '@webrcade/app-common';
 
@@ -15,6 +16,18 @@ class App extends WebrcadeRetroApp {
   CONTROLLERS_MODE = "controllers";
   lastKeyRow = 3;
   lastKeyCol = 2;
+
+  constructor() {
+    super();
+    this.state = {
+      ...this.state,
+      showCanvas: false,
+    };
+  }
+
+  showCanvas() {
+    this.setState({ showCanvas: true });
+  }
 
   createEmulator(app, isDebug) {
     const { appProps } = this;
@@ -62,8 +75,21 @@ class App extends WebrcadeRetroApp {
         controllerIndex={controllerIndex}
         initialRow={this.lastKeyRow}
         initialCol={this.lastKeyCol}
-        onSelect={(scancode, r, c) => { this.lastKeyRow = r; this.lastKeyCol = c; emulator.sendKeyDown(scancode); }}
-        closeCallback={() => { this.resume(CONTROLLERS_MODE); }}
+        onSelect={(scancode, r, c, keyCode) => { this.lastKeyRow = r; this.lastKeyCol = c; emulator.sendKeyDown(scancode, keyCode); }}
+        closeCallback={(r, c) => {
+          // WRC - closing without picking a key (cancel) used to leave
+          // lastKeyRow/lastKeyCol at wherever the last actual selection
+          // was, not wherever the cursor was just navigated to -
+          // reopening the keypad would jump back to the old selection
+          // instead of where the player had last been looking.
+          // ControllersScreen's close() now always passes its current
+          // row/col here, same fix as retro-a5200/colem.
+          if (r !== undefined && c !== undefined) {
+            this.lastKeyRow = r;
+            this.lastKeyCol = c;
+          }
+          this.resume(CONTROLLERS_MODE);
+        }}
         descriptions={descriptions}
         emulator={emulator}
       />
@@ -109,13 +135,32 @@ class App extends WebrcadeRetroApp {
   }
 
   render() {
-    const { mode } = this.state;
+    const { mode, showCanvas } = this.state;
     const { CONTROLLERS_MODE } = this;
 
     return (
       <>
         {super.render()}
         {mode === CONTROLLERS_MODE ? this.renderControllersScreen() : null}
+        <TouchOverlay
+          show={showCanvas}
+          showKeypad={true}
+          onKeypadClick={() => {
+            // WRC - must go through the emulator's showControllers()
+            // wrapper (same as the LT+RA gamepad gesture in
+            // emulator/index.js's pollControls()), not the bare App-level
+            // showControllers() directly - the wrapper is what pauses the
+            // emulator, disables real controller/keyboard input for the
+            // life of the keypad screen, and re-enables/resumes on close.
+            // Calling the App method directly skipped all of that, leaving
+            // input live while the keypad was open and never resuming on
+            // select/close.
+            const { emulator } = this;
+            if (emulator.pause(true)) {
+              emulator.showControllers(0);
+            }
+          }}
+        />
       </>
     );
   }

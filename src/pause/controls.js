@@ -37,7 +37,7 @@ export class GamepadControlsTab extends ControlsTab {
     if (emulator.icbm) {
       return (
         <>
-          {this.renderControl('start',   'Show Keypad')}
+          {this.renderControl('select',  'Show Keypad')}
           {this.renderControl('lanalog', 'Move Crosshair')}
           {this.renderControl('x',       'Fire Left Base')}
           {this.renderControl('b',       'Fire Right Base')}
@@ -56,7 +56,7 @@ export class GamepadControlsTab extends ControlsTab {
       const rtName = getName(emulator, 'rt');
       return (
         <>
-          {this.renderControl('start',   'Show Keypad')}
+          {this.renderControl('select',  'Show Keypad')}
           {this.renderControl('lanalog', 'Move (Player 1)')}
           {this.renderControl('dpad',    'Move (Player 1)')}
           {aName  && this.renderControl('a',     aName)}
@@ -83,7 +83,7 @@ export class GamepadControlsTab extends ControlsTab {
 
     return (
       <>
-        {this.renderControl('start', 'Show Keypad')}
+        {this.renderControl('select', 'Show Keypad')}
         {this.renderControl('lanalog', 'Move')}
         {this.renderControl('dpad', 'Move')}
         {aName  && this.renderControl('a',     aName)}
@@ -115,7 +115,7 @@ export class KeyboardControlsTab extends ControlsTab {
 
     return (
       <>
-        {this.renderKey('Enter', 'Show Keypad')}
+        {this.renderKey('ShiftRight', 'Show Keypad')}
         {this.renderKey('ArrowUp',    'Move Up')}
         {this.renderKey('ArrowDown',  'Move Down')}
         {this.renderKey('ArrowLeft',  'Move Left')}

@@ -97,7 +97,7 @@ export class Controller extends Component {
         if (e.index !== controllerIndex) return;
       }
       if (e.clientX !== undefined && e.clientX === 0) return;
-      onSelect(scancode, r, c);
+      onSelect(scancode, r, c, e && e.code);
     };
 
     const rows = SCANCODES.map((rowCodes, r) => (
@@ -188,7 +188,11 @@ export class ControllersScreen extends Screen {
       this.setState({ row: newRow, col: newCol });
     }
 
-    if (e.type === GamepadEnum.ESC || e.type === GamepadEnum.START) {
+    // WRC - per docs/control-mapping-audit.md's GRP3 target, Select opens
+    // this screen (see emulator/index.js's pollControls()), so Select
+    // should toggle-close it too, not Start - this used to be
+    // GamepadEnum.START, when Start was the button that opened it.
+    if (e.type === GamepadEnum.ESC || e.type === GamepadEnum.SELECT) {
       this.close();
     }
   }
@@ -197,11 +201,31 @@ export class ControllersScreen extends Screen {
     const { controllerIndex, row, col } = this.state;
     const { onSelect } = this.props;
 
+    // Shift-Right toggles this screen closed - CIDS.SELECT's own keyboard
+    // mapping (per docs/control-mapping-audit.md's "SL/RT+LA/Shift-R"),
+    // which now opens this screen the same way the gamepad Select combo
+    // does. Same fix as retro-a5200/colem.
+    if (e.code === KCODES.SHIFT_RIGHT) {
+      this.close();
+      return;
+    }
+
+    // Control also toggles this screen closed - the keyboard equivalent
+    // of the gamepad LT+RA combo (see emulator/index.js's pollControls()),
+    // which now opens this screen too, matching a5200/colem/Jaguar. By
+    // the time this screen is mounted, Control is always already up
+    // (the emulator's own Control handling waits for release before
+    // opening), so any keydown seen here is a genuine new press.
+    if (e.code === KCODES.CONTROL_LEFT || e.code === KCODES.CONTROL_RIGHT) {
+      this.close();
+      return;
+    }
+
     if (e.code === KCODES.SPACE_BAR || e.code === KCODES.ENTER) {
       if (controllerIndex === 0) {
         if (row >= 0 && col >= 0) {
           this.close();
-          onSelect(SCANCODES[row][col], row, col);
+          onSelect(SCANCODES[row][col], row, col, e.code);
         } else if (e.code === KCODES.ENTER) {
           this.close();
         }
@@ -245,10 +269,24 @@ export class ControllersScreen extends Screen {
     }
   }
 
-  onSelectFunc(scancode, r, c) {
+  onSelectFunc(scancode, r, c, keyCode) {
     const { onSelect } = this.props;
-    onSelect(scancode, r, c);
+    onSelect(scancode, r, c, keyCode);
     this.close();
+  }
+
+  // WRC - overrides Screen's base close() (which just calls
+  // closeCallback() with no args) so every close path - not just an
+  // actual key selection via onSelectFunc above - reports the current
+  // cursor position back to App.js's lastKeyRow/lastKeyCol. Without this,
+  // canceling out (Select/ESC/Shift-Right) after navigating around
+  // without picking a key would silently discard that navigation, and
+  // the keypad would reopen at the last *selected* key instead of the
+  // last *visited* one. Same fix as retro-a5200/colem.
+  close() {
+    const { row, col } = this.state;
+    const { closeCallback } = this.props;
+    if (closeCallback) closeCallback(row, col);
   }
 
   render() {
@@ -269,7 +307,7 @@ export class ControllersScreen extends Screen {
         emulator={emulator}
         descriptions={descriptions}
         controllerIndex={controllerIndex}
-        onSelect={(scancode, r, c) => this.onSelectFunc(scancode, r, c)}
+        onSelect={(scancode, r, c, keyCode) => this.onSelectFunc(scancode, r, c, keyCode)}
         col={col}
         row={row}
         onFocusChanged={onFocusChanged}
